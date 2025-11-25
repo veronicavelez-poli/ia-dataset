@@ -34,18 +34,44 @@ def plot_architecture(inputs, hidden):
 
     # Neuronas de entrada
     for i in range(inputs):
-        ax.scatter(x_in, 1 - (i + 1) / (inputs + 1),
-                   s=500, color="#8bd3dd", edgecolor="black")
-        ax.text(x_in - 0.07, 1 - (i + 1) / (inputs + 1), f"E{i+1}", fontsize=8)
+        ax.scatter(
+            x_in,
+            1 - (i + 1) / (inputs + 1),
+            s=500,
+            color="#8bd3dd",
+            edgecolor="black"
+        )
+        ax.text(
+            x_in - 0.07,
+            1 - (i + 1) / (inputs + 1),
+            f"E{i+1}",
+            fontsize=8
+        )
 
     # Neuronas ocultas
     for j in range(hidden):
-        ax.scatter(x_hid, 1 - (j + 1) / (hidden + 1),
-                   s=600, color="#ff9f1c", edgecolor="black")
-        ax.text(x_hid - 0.03, 1 - (j + 1) / (hidden + 1), f"H{j+1}", fontsize=8)
+        ax.scatter(
+            x_hid,
+            1 - (j + 1) / (hidden + 1),
+            s=600,
+            color="#ff9f1c",
+            edgecolor="black"
+        )
+        ax.text(
+            x_hid - 0.03,
+            1 - (j + 1) / (hidden + 1),
+            f"H{j+1}",
+            fontsize=8
+        )
 
     # Neurona salida
-    ax.scatter(x_out, 0.5, s=700, color="#9ef01a", edgecolor="black")
+    ax.scatter(
+        x_out,
+        0.5,
+        s=700,
+        color="#9ef01a",
+        edgecolor="black"
+    )
     ax.text(x_out + 0.03, 0.5, "Salida", fontsize=9)
 
     # Conexiones Entrada → Oculta
@@ -53,19 +79,28 @@ def plot_architecture(inputs, hidden):
         y1 = 1 - (i + 1) / (inputs + 1)
         for j in range(hidden):
             y2 = 1 - (j + 1) / (hidden + 1)
-            ax.plot([x_in + 0.03, x_hid - 0.03],
-                    [y1, y2], color="gray", linewidth=0.8)
+            ax.plot(
+                [x_in + 0.03, x_hid - 0.03],
+                [y1, y2],
+                color="gray",
+                linewidth=0.8
+            )
 
     # Conexiones Oculta → Salida
     for j in range(hidden):
         y2 = 1 - (j + 1) / (hidden + 1)
-        ax.plot([x_hid + 0.03, x_out - 0.03],
-                [y2, 0.5], color="gray", linewidth=0.8)
+        ax.plot(
+            [x_hid + 0.03, x_out - 0.03],
+            [y2, 0.5],
+            color="gray",
+            linewidth=0.8
+        )
 
     ax.set_title("Arquitectura de la Red Neuronal")
     ax.axis("off")
     plt.tight_layout()
     return fig
+
 
 # =====================================================
 # CARGAR DATOS
@@ -105,13 +140,16 @@ if pagina == "Entrenamiento de Modelos":
         split = int(0.7 * len(X))
         X_train, X_test = X[idx[:split]], X[idx[split:]]
         y_train, y_test = y[idx[:split]], y[idx[split:]]
-        
+
         # Crear modelo
         if modelo == "Regresión logística":
             model = LogisticRegressionCustom(lr=lr, n_iters=epochs)
         else:
             model = NeuralNetworkCustom(
-                n_inputs=X.shape[1], n_hidden=hidden, lr=lr, epochs=epochs
+                n_inputs=X.shape[1],
+                n_hidden=hidden,
+                lr=lr,
+                epochs=epochs
             )
 
         # Entrenar
@@ -119,6 +157,12 @@ if pagina == "Entrenamiento de Modelos":
         y_pred = model.predict(X_test)
 
         tn, fp, fn, tp = confusion_matrix(y_test, y_pred)
+
+        # Guardar modelo y normalización en sesión
+        st.session_state["model"] = model
+        st.session_state["X_mean"] = X_mean
+        st.session_state["X_std"] = X_std
+        st.session_state["modelo_tipo"] = modelo
 
         # Mostrar métricas
         st.subheader("Resultados del Modelo")
@@ -147,8 +191,19 @@ if pagina == "Entrenamiento de Modelos":
 elif pagina == "Predicción de Paciente":
 
     st.header("Predicción para un nuevo paciente")
+
+    # Verificar si ya hay un modelo entrenado en sesión
+    if "model" not in st.session_state:
+        st.warning("⚠ Primero entrena un modelo en la sección de *Entrenamiento de Modelos*.")
+        st.stop()
+
+    model = st.session_state["model"]
+    X_mean_s = st.session_state["X_mean"]
+    X_std_s = st.session_state["X_std"]
+
     st.write("Ingrese los datos clínicos para obtener una predicción.")
 
+    # Campos de entrada
     pregnancies = st.number_input("Pregnancies", 0, 20, 0)
     glucose = st.number_input("Glucose", 0.0, 300.0, 120.0)
     blood_pressure = st.number_input("BloodPressure", 0.0, 200.0, 70.0)
@@ -162,16 +217,14 @@ elif pagina == "Predicción de Paciente":
         try:
             x_new = np.array([[pregnancies, glucose, blood_pressure, skin,
                                insulin, bmi, pedigree, age]])
-            x_norm = (x_new - X_mean) / X_std
+            # Normalizar usando los valores de entrenamiento
+            x_norm = (x_new - X_mean_s) / X_std_s
 
-            if "model" in globals():
-                proba = model.predict_proba(x_norm)[0][0]
-                pred = int(proba >= 0.5)
+            proba = model.predict_proba(x_norm)[0][0]
+            pred = int(proba >= 0.5)
 
-                st.success(f"Probabilidad de diabetes: **{proba:.3f}**")
-                st.write(f"Clasificación: **{'DIABETES (1)' if pred == 1 else 'NO DIABETES (0)'}**")
-            else:
-                st.warning("⚠ Primero entrena un modelo en la sección anterior.")
+            st.success(f"Probabilidad de diabetes: **{proba:.3f}**")
+            st.write(f"Clasificación: **{'DIABETES (1)' if pred == 1 else 'NO DIABETES (0)'}**")
 
         except Exception as e:
             st.error(f"Error en la predicción: {e}")
@@ -184,12 +237,13 @@ elif pagina == "Créditos":
 
     st.header("Créditos del Proyecto")
     st.markdown("""
-    ### Proyecto académico – Universidad Politécnico Jaime Isaza Cadavid  
+    ### Proyecto académico – Politécnico Jaime Isaza Cadavid  
     **Curso:** Inteligencia Artificial  
+    **Docente:** Jorge Eliecer Giraldo  
     **Autores:**  
-    - Veronica Velez Lotero
-    - Isabel Medina
-    - Laura Murillo
+    - Veronica Velez Lotero  
+    - Isabel Medina Londoño  
+    - Laura Murillo Morales  
 
     ---
     <div style='text-align:center; font-size:13px; color:gray;'>
